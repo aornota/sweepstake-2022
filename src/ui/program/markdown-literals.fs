@@ -14,14 +14,14 @@ The **team/coach** will score (or lose) points for:
 (If a player receives a second yellow card in a match, the two yellow cards will be scored as a red card instead; however, if a player receives a yellow card followed by a "straight"
 red card, both cards will be scored.)
 
-Where multiple possible scores are given above, the score will depend on whether the team and their opponents are in the top 12 seeds:
-+ if the team **is** a top 12 seed but their opponents are **not**, the **lowest** score will apply
-+ if the team is **not** a top 12 seed but their opponents **are**, the **highest** score will apply
-+ if **both** teams are top 12 seeds - or if **neither** team is - the **middle** score will apply
+Where multiple possible scores are given above, the score will depend on whether the team and their opponents are in the top 16 seeds:
++ if the team **is** a top 16 seed but their opponents are **not**, the **lowest** score will apply
++ if the team is **not** a top 16 seed but their opponents **are**, the **highest** score will apply
++ if **both** teams are top 16 seeds - or if **neither** team is - the **middle** score will apply
 
-The top 12 seeds are (in order): Belgium; Italy; England; Germany; Spain; Ukraine; France; Poland; Switzerland; Croatia; Netherlands; and Russia.
+The top 16 seeds are (in order): Brazil; Belgium; France; Argentina; England; Spain; Portugal; Mexico; Netherlands; Denmark; Germany; Uruguay; Switzerland; United States; Croatia; and Senegal.
 
-The remaining teams are: Austria; Czech Republic; Denmark; Finland; Hungary; North Macedonia; Portugal; Scotland; Slovakia; Sweden; Turkey; and Wales.
+The remaining teams are: Australia; Cameroon; Canada; Costa Rica; Ecuador; Ghana; Iran; Japan; Morocco; Poland; Qatar; Saudi Arabia; Serbia; South Korea; Tunisia; and Wales.
 
 **All players** will score (or lose) points for:
 + being named **man-of-the-match**: **15**

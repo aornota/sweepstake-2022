@@ -1,6 +1,6 @@
 {
     "name": "sweepstake-2022",
-    "version": "pre-α",
+    "version": "α",
     "description": "The world-famous World Cup sweepstake. https://sweepstake-2022.azurewebsites.net/",
     "repository": "git@github.com:aornota/sweepstake-2022.git",
     "author": "dj narration",

@@ -101,8 +101,8 @@ let private cards (matchEventDic:MatchEventDic) =
             pair, cards)
 
 let private teamScoreEvents fixture role forSquadId againstSquadId (cards:((SquadId * PlayerId) * Card list) list) matchOutcome (squadDic:SquadDic) =
-    let isTop12 squadId = if squadId |> squadDic.ContainsKey then match squadDic.[squadId] with | Some seeding -> seeding <= Seeding 12 | None -> false else false
-    let forIsTop12, againstIsTop12 = forSquadId |> isTop12, againstSquadId |> isTop12
+    let isSeeded squadId = if squadId |> squadDic.ContainsKey then match squadDic.[squadId] with | Some _ -> true | None -> false else false
+    let forIsSeeded, againstIsSeeded = forSquadId |> isSeeded, againstSquadId |> isSeeded
     let matchResult =
         match matchOutcome.PenaltyShootoutOutcome with
         | Some penaltyShootoutOutcome ->
@@ -114,12 +114,12 @@ let private teamScoreEvents fixture role forSquadId againstSquadId (cards:((Squa
     let matchResultEvent =
         match role, matchResult with
         | Home, HomeWin | Away, AwayWin ->
-            let points = match forIsTop12, againstIsTop12 with | true, false -> 12<point> | false, true -> 20<point> | _ -> 16<point>
+            let points = match forIsSeeded, againstIsSeeded with | true, false -> 12<point> | false, true -> 20<point> | _ -> 16<point>
             [ MatchWon, points ]
         | _, Draw ->
             match fixture.Stage with
             | Group _ ->
-                let points = match forIsTop12, againstIsTop12 with | true, false -> 4<point> | false, true -> 8<point> | _ -> 6<point>
+                let points = match forIsSeeded, againstIsSeeded with | true, false -> 4<point> | false, true -> 8<point> | _ -> 6<point>
                 [ MatchDrawn, points ]
             | _ -> [] // note: no draws for knockout matches
         | Home, AwayWin | Away, HomeWin -> []
