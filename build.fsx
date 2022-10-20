@@ -109,8 +109,8 @@ Target.create "arm-template" (fun _ ->
     let environment = "sweepstake-2022"
     let authCtx =
         let subscriptionId = Guid("9ad207a4-28b9-48a4-b6ba-710c35034343") // azure-djnarration
-        let clientId = Guid("00000000-0000-0000-0000-000000000000") // TODO-NMB-2022...sweepstake-2022 [Azure AD application]
-        let tenantId = Guid("00000000-0000-0000-0000-000000000000") // TODO-NMB-2022...sweepstake-2022 [Azure AD application]
+        let clientId = Guid("54edaac3-4a34-4a77-b8c7-96203481ed48") // sweepstake-2022 [Azure AD application registration]
+        let tenantId = Guid("39a59a1a-2733-4a43-8865-075ddc3edb85") // sweepstake-2022 [Azure AD application registration]
         Trace.tracefn "Deploying template '%s' to resource group '%s' in subscription '%O'..." armTemplate environment subscriptionId
         authenticateDevice Trace.trace { ClientId = clientId ; TenantId = Some tenantId } subscriptionId |> Async.RunSynchronously
     let deployment =
