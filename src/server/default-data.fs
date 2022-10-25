@@ -630,13 +630,13 @@ let private createInitialDraftsEventsIfNecessary = async {
         [] |> drafts.OnUserDraftsEventsRead
 
         let draft1Id, draft1Ordinal = Guid "00000000-0000-0000-0000-000000000001" |> DraftId, DraftOrdinal 1
-        let draft1Starts, draft1Ends = (2022, 11, 07, 09, 00) |> dateTimeOffsetUtc, (2022, 11, 13, 21, 00) |> dateTimeOffsetUtc
+        let draft1Starts, draft1Ends = (2022, 11, 07, 09, 00) |> dateTimeOffsetUtc, (2022, 11, 15, 21, 00) |> dateTimeOffsetUtc
         let draft1Type = (draft1Starts, draft1Ends) |> Constrained
         let! result = nephTokens.ProcessDraftToken |> ifToken (fun token -> (token, nephId, draft1Id, draft1Ordinal, draft1Type) |> drafts.HandleCreateDraftCmdAsync)
         result |> logShouldSucceed (sprintf "HandleCreateDraftCmdAsync (%A %A)" draft1Id draft1Ordinal)
 
         let draft2Id, draft2Ordinal = Guid "00000000-0000-0000-0000-000000000002" |> DraftId, DraftOrdinal 2
-        let draft2Starts, draft2Ends = (2022, 11, 14, 09, 00) |> dateTimeOffsetUtc, (2022, 11, 19, 21, 00) |> dateTimeOffsetUtc
+        let draft2Starts, draft2Ends = (2022, 11, 16, 09, 00) |> dateTimeOffsetUtc, (2022, 11, 20, 12, 00) |> dateTimeOffsetUtc
         let draft2Type = (draft2Starts, draft2Ends) |> Constrained
         let! result = nephTokens.ProcessDraftToken |> ifToken (fun token -> (token, nephId, draft2Id, draft2Ordinal, draft2Type) |> drafts.HandleCreateDraftCmdAsync)
         result |> logShouldSucceed (sprintf "HandleCreateDraftCmdAsync (%A %A)" draft2Id draft2Ordinal)
