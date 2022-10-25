@@ -24,8 +24,8 @@ The top 16 seeds are (in order): Brazil; Belgium; France; Argentina; England; Sp
 The remaining teams are: Australia; Cameroon; Canada; Costa Rica; Ecuador; Ghana; Iran; Japan; Morocco; Poland; Qatar; Saudi Arabia; Serbia; South Korea; Tunisia; and Wales.
 
 **All players** will score (or lose) points for:
-+ being named **man-of-the-match**: **15**
-+ **scoring** a **goal** or a **penalty**: **12**
++ being named **man-of-the-match**: **10** if the player is a forward; **15** if the player is a midfielder; **20** if the player is a defender or a goalkeeper
++ **scoring** a **goal** or a **penalty**: **9** if the player is a forward; **12** if the player is a midfielder; **15** if the player is a defender; **20** if the player is a goalkeeper
 + **assisting** a **goal**: **3** (note that a goal cannot be assisted by the same player who scored the goal)
 + **missing** a **penalty**: **-6**
 + **scoring** an **own goal**: **-6**

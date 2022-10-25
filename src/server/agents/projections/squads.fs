@@ -355,8 +355,8 @@ type Squads () =
         let onEvent = (fun event ->
             match event with
             | SquadsRead squadsRead -> squadsRead |> OnSquadsRead |> agent.Post
-            | SquadEventWritten (rvn, userEvent) ->
-                match userEvent with
+            | SquadEventWritten (rvn, squadEvent: SquadEvent) ->
+                match squadEvent with
                 | SquadCreated _ -> () // note: no need to handle since cannot happen once SquadsRead
                 | PlayerAdded (squadId, playerId, playerName, playerType) -> (squadId, rvn, playerId, playerName, playerType) |> OnPlayerAdded |> agent.Post
                 | PlayerNameChanged (squadId, playerId, playerName) -> (squadId, rvn, playerId, playerName) |> OnPlayerNameChanged |> agent.Post

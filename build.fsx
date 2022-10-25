@@ -102,9 +102,13 @@ Target.create "publish-ui-azure" (fun _ ->
     buildUiAzure ()
     publishUi ())
 Target.create "publish" ignore
-Target.create "publish-azure" ignore
 
-Target.create "arm-template" (fun _ ->
+Target.create "publish-azure" (fun _ ->
+    let zipFile = "deploy.zip"
+    IO.File.Delete(zipFile)
+    Zip.zip publishDir zipFile !!(publishDir + @"\**\**"))
+
+(* Target.create "arm-template" (fun _ ->
     let armTemplate = "arm-template.json"
     let environment = "sweepstake-2022"
     let authCtx =
@@ -141,7 +145,7 @@ Target.create "deploy-azure" (fun _ ->
     let destinationUri = sprintf "https://%s.scm.azurewebsites.net/api/zipdeploy" appName
     let client = new TimeoutWebClient(Credentials = NetworkCredential("$" + appName, appPassword))
     Trace.tracefn "Uploading %s to %s..." zipFile destinationUri
-    client.UploadData(destinationUri, IO.File.ReadAllBytes(zipFile)) |> ignore)
+    client.UploadData(destinationUri, IO.File.ReadAllBytes(zipFile)) |> ignore) *)
 
 Target.create "help" (fun _ ->
     printfn "\nThese useful build targets can be run via 'fake build -t {target}':"
@@ -165,6 +169,6 @@ Target.create "help" (fun _ ->
 "clean-ui-publish" ==> "publish-ui-azure"
 "clean-publish" ==> "publish-ui-azure" ==> "publish-azure"
 
-"publish-azure" ==> "arm-template" ==> "deploy-azure"
+(* "publish-azure" ==> "arm-template" ==> "deploy-azure" *)
 
 Target.runOrDefaultWithArguments "help"

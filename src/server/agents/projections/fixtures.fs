@@ -4,6 +4,7 @@ module Aornota.Sweepstake2022.Server.Agents.Projections.Fixtures
    Subscribes: FixturesRead
                FixtureEventWritten (ParticipantConfirmed | MatchEventAdded | MatchEventRemoved)
                SquadsRead
+               SquadEventWritten (PlayerAdded | PlayerTypeChanged)
                Disconnected *)
 
 open Aornota.Sweepstake2022.Common.Domain.Fixture
@@ -16,6 +17,7 @@ open Aornota.Sweepstake2022.Server.Agents.ConsoleLogger
 open Aornota.Sweepstake2022.Server.Common.DeltaHelper
 open Aornota.Sweepstake2022.Server.Connection
 open Aornota.Sweepstake2022.Server.Events.FixtureEvents
+open Aornota.Sweepstake2022.Server.Events.SquadEvents
 open Aornota.Sweepstake2022.Server.Signal
 
 open System
@@ -28,6 +30,8 @@ type private FixtureInput =
     | OnMatchEventAdded of fixtureId : FixtureId * rvn : Rvn * matchEventId : MatchEventId * matchEvent : MatchEvent
     | OnMatchEventRemoved of fixtureId : FixtureId * rvn : Rvn * matchEventId : MatchEventId
     | OnSquadsRead of squadsRead : SquadRead list
+    | OnPlayerAdded of playerId : PlayerId * playerType : PlayerType
+    | OnPlayerTypeChanged of playerId : PlayerId * playerType : PlayerType
     | RemoveConnections of connectionIds : ConnectionId list
     | HandleInitializeFixturesProjectionQry of connectionId : ConnectionId
         * reply : AsyncReplyChannel<Result<FixtureDto list, OtherError<string>>>
@@ -38,15 +42,17 @@ type private Fixture = { Rvn : Rvn ; Stage : Stage ; HomeParticipant : Participa
 type private FixtureDic = Dictionary<FixtureId, Fixture>
 
 type private SquadDic = Dictionary<SquadId, Seeding option>
+type private PlayerDic = Dictionary<PlayerId, PlayerType>
 
 type private Projectee = { LastRvn : Rvn }
 type private ProjecteeDic = Dictionary<ConnectionId, Projectee>
 
-type private State = { FixtureDic : FixtureDic ; SquadDic : SquadDic }
+type private State = { FixtureDic : FixtureDic ; SquadDic : SquadDic ; PlayerDic : PlayerDic }
 
 type private StateChangeType =
-    | Initialization of fixtureDic : FixtureDic * squadDic : SquadDic
+    | Initialization of fixtureDic : FixtureDic * squadDic : SquadDic * playerDic : PlayerDic
     | FixtureChange of fixtureDic : FixtureDic * state : State
+    | PlayerChange of playerDic : PlayerDic * state : State
 
 type private FixtureDtoDic = Dictionary<FixtureId, FixtureDto>
 
@@ -134,19 +140,34 @@ let private teamScoreEvents fixture role forSquadId againstSquadId (cards:((Squa
             else [])
     matchResultEvent @ cardEvents
 
-let private playerScoreEvents forSquadId (cards:((SquadId * PlayerId) * Card list) list) (matchEventDic:MatchEventDic) =
+let private playerScoreEvents forSquadId (cards:((SquadId * PlayerId) * Card list) list) (matchEventDic:MatchEventDic) (playerDic:PlayerDic) =
+    let goalOrPenaltyScore playerId =
+        if playerId |> playerDic.ContainsKey then
+            match playerDic.[playerId] with
+            | Goalkeeper -> 20<point>
+            | Defender -> 15<point>
+            | Midfielder -> 12<point>
+            | Forward -> 9<point>
+        else 0<point> // should never happen
+    let manOfTheMatchScore playerId =
+        if playerId |> playerDic.ContainsKey then
+            match playerDic.[playerId] with
+            | Goalkeeper | Defender -> 20<point>
+            | Midfielder -> 15<point>
+            | Forward -> 10<point>
+        else 0<point> // should never happen
     let nonCardEvents =
         matchEventDic |> List.ofSeq |> List.collect (fun (KeyValue (_, matchEvent)) ->
             match matchEvent with
-            | Goal (squadId, playerId, Some assistedBy) when squadId = forSquadId -> [ playerId, (GoalScored, 12<point>) ; assistedBy, (GoalAssisted, 3<point>) ]
-            | Goal (squadId, playerId, None) when squadId = forSquadId -> [ playerId, (GoalScored, 12<point>) ]
+            | Goal (squadId, playerId, Some assistedBy) when squadId = forSquadId -> [ playerId, (GoalScored, goalOrPenaltyScore playerId) ; assistedBy, (GoalAssisted, 3<point>) ]
+            | Goal (squadId, playerId, None) when squadId = forSquadId -> [ playerId, (GoalScored, goalOrPenaltyScore playerId) ]
             | OwnGoal (squadId, playerId) when squadId = forSquadId -> [ playerId, (OwnGoalScored, -6<point>) ]
-            | Penalty (squadId, playerId, Scored) when squadId = forSquadId -> [ playerId, (PenaltyScored, 12<point>) ]
+            | Penalty (squadId, playerId, Scored) when squadId = forSquadId -> [ playerId, (PenaltyScored, goalOrPenaltyScore playerId) ]
             | Penalty (squadId, playerId, Missed) when squadId = forSquadId -> [ playerId, (PenaltyMissed, -6<point>) ]
             | Penalty (squadId, playerId, Saved _) when squadId = forSquadId -> [ playerId, (PenaltyMissed, -6<point>) ]
             | Penalty (_, _, Saved (squadId, playerId)) when squadId = forSquadId -> [ playerId, (PenaltySaved, 12<point>) ]
             | CleanSheet (squadId, playerId) when squadId = forSquadId -> [ playerId, (CleanSheetKept, 12<point>) ]
-            | ManOfTheMatch (squadId, playerId) when squadId = forSquadId -> [ playerId, (ManOfTheMatchAwarded, 15<point>) ]
+            | ManOfTheMatch (squadId, playerId) when squadId = forSquadId -> [ playerId, (ManOfTheMatchAwarded, manOfTheMatchScore playerId) ]
             | _ -> [])
     let cardEvents =
         cards |> List.collect (fun ((squadId, playerId), cards) ->
@@ -161,16 +182,16 @@ let private playerScoreEvents forSquadId (cards:((SquadId * PlayerId) * Card lis
     |> List.groupBy fst
     |> List.map (fun (playerId, events) -> playerId, events |> List.map snd)
 
-let private fixtureDto (squadDic:SquadDic) (fixtureId, fixture:Fixture) : FixtureDto =
+let private fixtureDto (squadDic:SquadDic) (playerDic:PlayerDic) (fixtureId, fixture:Fixture) : FixtureDto =
     let matchResult =
         match fixture |> matchOutcome with
         | Some (homeSquadId, awaySquadId, matchOutcome) ->
             let matchEventDic = fixture.MatchEventDic
             let cards = matchEventDic |> cards
             let homeTeamScoreEvents = teamScoreEvents fixture Home homeSquadId awaySquadId cards matchOutcome squadDic
-            let homePlayerScoreEvents = playerScoreEvents homeSquadId cards matchEventDic
+            let homePlayerScoreEvents = playerScoreEvents homeSquadId cards matchEventDic playerDic
             let awayTeamScoreEvents = teamScoreEvents fixture Away awaySquadId homeSquadId cards matchOutcome squadDic
-            let awayPlayerScoreEvents = playerScoreEvents awaySquadId cards matchEventDic
+            let awayPlayerScoreEvents = playerScoreEvents awaySquadId cards matchEventDic playerDic
             let homeScoreEvents = { TeamScoreEvents = homeTeamScoreEvents ; PlayerScoreEvents = homePlayerScoreEvents }
             let awayScoreEvents = { TeamScoreEvents = awayTeamScoreEvents ; PlayerScoreEvents = awayPlayerScoreEvents }
             let matchEvents = matchEventDic |> List.ofSeq |> List.map (fun (KeyValue (matchEventId, matchEvent)) -> matchEventId, matchEvent)
@@ -179,14 +200,14 @@ let private fixtureDto (squadDic:SquadDic) (fixtureId, fixture:Fixture) : Fixtur
     { FixtureId = fixtureId ; Rvn = fixture.Rvn ; Stage = fixture.Stage ; HomeParticipant = fixture.HomeParticipant ; AwayParticipant = fixture.AwayParticipant ; KickOff = fixture.KickOff
       MatchResult = matchResult }
 
-let private fixtureDtoDic (squadDic:SquadDic) (fixtureDic:FixtureDic) =
+let private fixtureDtoDic (squadDic:SquadDic) (playerDic:PlayerDic) (fixtureDic:FixtureDic) =
     let fixtureDtoDic = FixtureDtoDic ()
     fixtureDic |> List.ofSeq |> List.iter (fun (KeyValue (fixtureId, fixture)) -> 
-        let fixtureDto = (fixtureId, fixture) |> fixtureDto squadDic
+        let fixtureDto = (fixtureId, fixture) |> fixtureDto squadDic playerDic
         (fixtureDto.FixtureId, fixtureDto) |> fixtureDtoDic.Add)
     fixtureDtoDic
 
-let private fixtureDtos state = state.FixtureDic |> List.ofSeq |> List.map (fun (KeyValue (fixtureId, fixture)) -> (fixtureId, fixture) |> fixtureDto state.SquadDic)
+let private fixtureDtos state = state.FixtureDic |> List.ofSeq |> List.map (fun (KeyValue (fixtureId, fixture)) -> (fixtureId, fixture) |> fixtureDto state.SquadDic state.PlayerDic)
 
 let private sendMsg connectionIds serverMsg = (serverMsg, connectionIds) |> SendMsg |> broadcaster.Broadcast
 
@@ -199,23 +220,43 @@ let private sendFixtureDtoDelta (projecteeDic:ProjecteeDic) fixtureDtoDelta =
         (connectionId, projectee) |> updatedProjecteeDic.Add)
     updatedProjecteeDic |> List.ofSeq |> List.iter (fun (KeyValue (connectionId, projectee)) -> projecteeDic.[connectionId] <- projectee)
 
+let private copyPlayerDic (playerDic:PlayerDic) =
+    let copiedPlayerDic = PlayerDic ()
+    playerDic |> List.ofSeq |> List.iter (fun (KeyValue (playerId, playerType)) -> (playerId, playerType) |> copiedPlayerDic.Add)
+    copiedPlayerDic
+
 let private updateState source (projecteeDic:ProjecteeDic) stateChangeType =
     let source = sprintf "%s#updateState" source
     let newState =
         match stateChangeType with
-        | Initialization (fixtureDic, squadDic) ->
+        | Initialization (fixtureDic, squadDic, playerDic) ->
             sprintf "%s -> initialized" source |> Info |> log
-            { FixtureDic = FixtureDic fixtureDic ; SquadDic = squadDic } // note: no need to copy squadDic since never changes
+            { FixtureDic = FixtureDic fixtureDic ; SquadDic = squadDic ; PlayerDic = playerDic |> copyPlayerDic } // note: no need to copy squadDic since never changes
         | FixtureChange (fixtureDic, state) ->
             let squadDic = state.SquadDic
-            let previousFixtureDtoDic = state.FixtureDic |> fixtureDtoDic squadDic
-            let fixtureDtoDic = fixtureDic |> fixtureDtoDic squadDic
+            let playerDic = state.PlayerDic
+            let previousFixtureDtoDic = state.FixtureDic |> fixtureDtoDic squadDic playerDic
+            let fixtureDtoDic = fixtureDic |> fixtureDtoDic squadDic playerDic
             let fixtureDtoDelta = fixtureDtoDic |> delta previousFixtureDtoDic
             if fixtureDtoDelta |> isEmpty |> not then
                 sprintf "%s -> FixtureDto delta %A -> %i projectee/s" source fixtureDtoDelta projecteeDic.Count |> Info |> log
                 fixtureDtoDelta |> sendFixtureDtoDelta projecteeDic
                 sprintf "%s -> updated" source |> Info |> log
                 { state with FixtureDic = FixtureDic fixtureDic }
+            else
+                sprintf "%s -> unchanged" source |> Info |> log
+                state
+        | PlayerChange (playerDic, state) ->
+            let fixtureDic = state.FixtureDic
+            let squadDic = state.SquadDic
+            let previousFixtureDtoDic = state.FixtureDic |> fixtureDtoDic squadDic state.PlayerDic
+            let fixtureDtoDic = fixtureDic |> fixtureDtoDic squadDic playerDic
+            let fixtureDtoDelta = fixtureDtoDic |> delta previousFixtureDtoDic
+            if fixtureDtoDelta |> isEmpty |> not then
+                sprintf "%s -> FixtureDto delta %A -> %i projectee/s" source fixtureDtoDelta projecteeDic.Count |> Info |> log
+                fixtureDtoDelta |> sendFixtureDtoDelta projecteeDic
+                sprintf "%s -> updated" source |> Info |> log
+                { state with PlayerDic = playerDic |> copyPlayerDic }
             else
                 sprintf "%s -> unchanged" source |> Info |> log
                 state
@@ -233,9 +274,13 @@ let private ifAllRead source (fixturesRead:(FixtureRead list) option, squadsRead
                             KickOff = fixtureRead.KickOff ; MatchEventDic = matchEventDic }
             (fixtureRead.FixtureId, fixture) |> fixtureDic.Add)
         let squadDic = SquadDic ()
-        squadsRead |> List.iter (fun squadRead -> if squadRead.SquadId |> squadDic.ContainsKey |> not then (squadRead.SquadId, squadRead.Seeding) |> squadDic.Add)
+        let playerDic = PlayerDic ()
+        squadsRead |> List.iter (fun squadRead ->
+            squadRead.PlayersRead |> List.iter (fun playerRead ->
+                if playerRead.PlayerId |> playerDic.ContainsKey |> not then (playerRead.PlayerId, playerRead.PlayerType) |> playerDic.Add)
+            if squadRead.SquadId |> squadDic.ContainsKey |> not then (squadRead.SquadId, squadRead.Seeding) |> squadDic.Add)
         let projecteeDic = ProjecteeDic ()
-        let state = (fixtureDic, squadDic) |> Initialization |> updateState source projecteeDic
+        let state = (fixtureDic, squadDic, playerDic) |> Initialization |> updateState source projecteeDic
         (state, fixtureDic, projecteeDic) |> Some
     | _ -> None
 
@@ -253,6 +298,8 @@ type Fixtures () =
             | OnMatchEventAdded _ -> "OnMatchEventAdded when awaitingStart" |> IgnoredInput |> Agent |> log ; return! awaitingStart ()
             | OnMatchEventRemoved _ -> "OnMatchEventRemoved when awaitingStart" |> IgnoredInput |> Agent |> log ; return! awaitingStart ()
             | OnSquadsRead _ -> "OnSquadsRead when awaitingStart" |> IgnoredInput |> Agent |> log ; return! awaitingStart ()
+            | OnPlayerAdded _ -> "OnPlayerAdded when awaitingStart" |> IgnoredInput |> Agent |> log ; return! awaitingStart ()
+            | OnPlayerTypeChanged _ -> "OnPlayerTypeChanged when awaitingStart" |> IgnoredInput |> Agent |> log ; return! awaitingStart ()
             | RemoveConnections _ -> "RemoveConnections when awaitingStart" |> IgnoredInput |> Agent |> log ; return! awaitingStart ()
             | HandleInitializeFixturesProjectionQry _ -> "HandleInitializeFixturesProjectionQry when awaitingStart" |> IgnoredInput |> Agent |> log ; return! awaitingStart () }
         and pendingAllRead fixturesRead squadsRead = async {
@@ -278,6 +325,8 @@ type Fixtures () =
                 | Some (state, fixtureDic, projecteeDic) ->
                     return! projectingFixtures state fixtureDic projecteeDic
                 | None -> return! pendingAllRead fixturesRead squadsRead
+            | OnPlayerAdded _ -> "OnPlayerAdded when pendingAllRead" |> IgnoredInput |> Agent |> log ; return! pendingAllRead fixturesRead squadsRead
+            | OnPlayerTypeChanged _ -> "OnPlayerTypeChanged when pendingAllRead" |> IgnoredInput |> Agent |> log ; return! pendingAllRead fixturesRead squadsRead
             | RemoveConnections _ -> "RemoveConnections when pendingAllRead" |> IgnoredInput |> Agent |> log ; return! pendingAllRead fixturesRead squadsRead
             | HandleInitializeFixturesProjectionQry _ -> "HandleInitializeFixturesProjectionQry when pendingAllRead" |> IgnoredInput |> Agent |> log ; return! pendingAllRead fixturesRead squadsRead }
         and projectingFixtures state fixtureDic projecteeDic = async {
@@ -329,6 +378,26 @@ type Fixtures () =
                     else state
                 return! projectingFixtures state fixtureDic projecteeDic
             | OnSquadsRead _ -> "OnSquadsRead when projectingFixtures" |> IgnoredInput |> Agent |> log ; return! projectingFixtures state fixtureDic projecteeDic
+            | OnPlayerAdded (playerId, playerType) ->
+                let source = "OnPlayerAdded"
+                sprintf "%s (%A %A) when projectingFixtures (%i fixture/s) (%i projectee/s)" source playerId playerType fixtureDic.Count projecteeDic.Count |> Info |> log
+                let state =
+                    let playerDic = state.PlayerDic
+                    if playerId |> playerDic.ContainsKey |> not then // note: silently ignore already-known playerId (should never happen)
+                        (playerId, playerType) |> playerDic.Add
+                        (playerDic, state) |> PlayerChange |> updateState source projecteeDic
+                    else state
+                return! projectingFixtures state fixtureDic projecteeDic
+            | OnPlayerTypeChanged (playerId, playerType) ->
+                let source = "OnPlayerTypeChanged"
+                sprintf "%s (%A %A) when projectingFixtures (%i squad/s) (%i projectee/s)" source playerId playerType fixtureDic.Count projecteeDic.Count |> Info |> log
+                let state =
+                    let playerDic = state.PlayerDic
+                    if playerId |> playerDic.ContainsKey then // note: silently ignore unknown playerId (should never happen)
+                        playerDic.[playerId] <- playerType
+                        (playerDic, state) |> PlayerChange |> updateState source projecteeDic
+                    else state
+                return! projectingFixtures state fixtureDic projecteeDic
             | RemoveConnections connectionIds ->
                 let source = "RemoveConnections"
                 sprintf "%s (%A) when projectingFixtures (%i fixture/s) (%i projectee/s)" source connectionIds fixtureDic.Count projecteeDic.Count |> Info |> log
@@ -360,10 +429,16 @@ type Fixtures () =
                 | MatchEventAdded (fixtureId, matchEventId, matchEvent) -> (fixtureId, rvn, matchEventId, matchEvent) |> OnMatchEventAdded |> agent.Post
                 | MatchEventRemoved (fixtureId, matchEventId) -> (fixtureId, rvn, matchEventId) |> OnMatchEventRemoved |> agent.Post
             | SquadsRead squadsRead -> squadsRead |> OnSquadsRead |> agent.Post
+            | SquadEventWritten (_, squadEvent) ->
+                match squadEvent with
+                | SquadCreated _ -> () // note: no need to handle since cannot happen once SquadsRead
+                | PlayerAdded (_, playerId, _, playerType) -> (playerId, playerType) |> OnPlayerAdded |> agent.Post
+                | PlayerTypeChanged (_, playerId, playerType) -> (playerId, playerType) |> OnPlayerTypeChanged |> agent.Post
+                | PlayerNameChanged _ | PlayerWithdrawn _ | SquadEliminated _ -> () // note: no need to handle
             | Disconnected connectionId -> [ connectionId ] |> RemoveConnections |> agent.Post
             | _ -> ())
         let subscriptionId = onEvent |> broadcaster.SubscribeAsync |> Async.RunSynchronously
-        sprintf "agent subscribed to FixturesRead | FixtureEventWritten | SquadsRead | Disconnected broadcasts -> %A" subscriptionId |> Info |> log
+        sprintf "agent subscribed to FixturesRead | FixtureEventWritten | SquadsRead | SquadEventWritten (subset) | Disconnected broadcasts -> %A" subscriptionId |> Info |> log
         Start |> agent.PostAndReply // note: not async (since need to start agents deterministically)
     member __.HandleInitializeFixturesProjectionQryAsync connectionId =
         (fun reply -> (connectionId, reply) |> HandleInitializeFixturesProjectionQry) |> agent.PostAndAsyncReply

@@ -182,11 +182,15 @@ let playerPoints (fixtureDic:FixtureDic) (squadId, playerId) pickedDate =
                     (fixture.KickOff, playerScoreEvents) |> Some
                 else None
             | _ -> None)
-        |> List.map (fun (kickOff, events) -> events |> List.map (fun (_, points) -> kickOff, points))
+        |> List.map (fun (kickOff, events) ->
+            events |> List.map (fun (playerScoreEvent, points) ->
+                let isPlayerTypeSpecificScoreEvent = match playerScoreEvent with | GoalScored | PenaltyScored -> true | _ -> false
+                kickOff, points, isPlayerTypeSpecificScoreEvent))
         |> List.collect id
-    let points = playerScoreEvents |> List.sumBy snd
+    let points = playerScoreEvents |> List.sumBy (fun (_, points, _) -> points)
     let pickedPoints =
         match pickedDate with
-        | Some pickedDate -> playerScoreEvents |> List.filter (fun (kickOff, _) -> kickOff > pickedDate) |> List.sumBy snd |> Some
+        | Some pickedDate -> playerScoreEvents |> List.choose (fun (kickOff, points, _) -> if kickOff > pickedDate then Some points else None) |> List.sum |> Some
         | None -> None
-    points, pickedPoints
+    let hasPlayerTypeSpecificScoreEvents = playerScoreEvents |> List.exists (fun (_, _, isPlayerTypeSpecificScoreEvent) -> isPlayerTypeSpecificScoreEvent)
+    points, pickedPoints, hasPlayerTypeSpecificScoreEvents

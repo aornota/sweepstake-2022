@@ -479,8 +479,8 @@ let private renderPlayers (useDefaultTheme, playerDic:PlayerDic, squadId, squad,
             let onClick = (fun _ -> (squadId, playerId) |> ShowChangePlayerNameModal |> dispatch)
             [ [ str "Edit name" ] |> para theme paraDefaultSmallest ] |> link theme (Internal onClick) |> Some
         else None
-    let changePosition playerId =
-        if canEdit then
+    let changePosition playerId hasPlayerTypeSpecificScoreEvents =
+        if canEdit && not hasPlayerTypeSpecificScoreEvents then
             let onClick = (fun _ -> (squadId, playerId) |> ShowChangePlayerTypeModal |> dispatch)
             [ [ str "Change position" ] |> para theme paraDefaultSmallest ] |> link theme (Internal onClick) |> Some
         else None
@@ -517,14 +517,14 @@ let private renderPlayers (useDefaultTheme, playerDic:PlayerDic, squadId, squad,
         let draftLeft, draftRight = draftLeftAndRight playerId player
         let pickedBy = player.PickedBy |> pickedByTag theme userDic authUser
         let pickedByUserId, pickedDate = match player.PickedBy with | Some (userId, _, date) -> userId |> Some, date |> Some | None -> None, None
-        let points, pickedByPoints = playerPoints fixtureDic (squadId, playerId) pickedDate
+        let points, pickedByPoints, hasPlayerTypeSpecificScoreEvents = playerPoints fixtureDic (squadId, playerId) pickedDate
         let score = score points pickedByPoints pickedByUserId userDic
         tr false [
             td [ [ str playerName ] |> para theme paraDefaultSmallest ]
             td [ RctH.ofOption (editName playerId) ]
             td [ RctH.ofOption (withdrawn player) ]
             td [ [ str playerTypeText ] |> para theme paraCentredSmallest ]
-            td [ RctH.ofOption (changePosition playerId) ]
+            td [ RctH.ofOption (changePosition playerId hasPlayerTypeSpecificScoreEvents) ]
             td [ RctH.ofOption draftLeft ]
             td [ RctH.ofOption draftRight ]
             td [ RctH.ofOption pickedBy ]
