@@ -127,7 +127,7 @@ let private renderStandings (useDefaultTheme, users:(UserId * UserName) list, sq
                     let playerPoints =
                         players
                         |> List.choose (fun (squadId, _, playerId, _, _, timestamp) ->
-                            let _, playerPoints = playerPoints previousFixtureDic (squadId, playerId) (timestamp |> Some)
+                            let _, playerPoints, _ = playerPoints previousFixtureDic (squadId, playerId) (timestamp |> Some)
                             playerPoints)
                         |> List.sum
                     let points = teamPoints + playerPoints
@@ -168,7 +168,7 @@ let private renderStandings (useDefaultTheme, users:(UserId * UserName) list, sq
                 let playerPoints =
                     players
                     |> List.choose (fun (squadId, _, playerId, _, _, timestamp) ->
-                        let _, playerPoints = playerPoints fixtureDic (squadId, playerId) (timestamp |> Some)
+                        let _, playerPoints, _ = playerPoints fixtureDic (squadId, playerId) (timestamp |> Some)
                         playerPoints)
                     |> List.sum
                 let points = teamPoints + playerPoints
@@ -316,7 +316,7 @@ let private renderSweepstakerPlayers (useDefaultTheme, userId, players:(SquadId 
                     | Withdrawn _ -> [ [ str "Withdrawn" ] |> tag theme { tagWarning with IsRounded = false } ] |> para theme paraDefaultSmallest |> Some
                     | Active -> None
             let eliminated = if squad.Eliminated then [ [ str "Eliminated" ] |> tag theme { tagWarning with IsRounded = false } ] |> para theme paraDefaultSmallest |> Some else None
-            let points, pickedByPoints = playerPoints fixtureDic (squadId, playerId) (timestamp |> Some)
+            let points, pickedByPoints, _ = playerPoints fixtureDic (squadId, playerId) (timestamp |> Some)
             let score = score points pickedByPoints (userId |> Some) userDic
             tr false [
                 td [ [ str playerName ] |> para theme paraDefaultSmallest ]
@@ -421,7 +421,7 @@ let private renderBestPlayers (useDefaultTheme, playerType, unpickedOnly, squadD
                 |> List.filter (fun (_, player) -> match playerType with | Some playerType -> playerType = player.PlayerType | None -> true)
                 |> List.map (fun (playerId, player) ->
                     let pickedByUserId, pickedDate = match player.PickedBy with | Some (userId, _, date) -> userId |> Some, date |> Some | None -> None, None
-                    let points, pickedByPoints = playerPoints fixtureDic (squadId, playerId) pickedDate
+                    let points, pickedByPoints, _ = playerPoints fixtureDic (squadId, playerId) pickedDate
                     squad, player, points, pickedByPoints, pickedByUserId))
             |> List.collect id
             |> List.filter (fun (_, _, points, _, _) -> points > 0<point>)

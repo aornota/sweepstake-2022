@@ -203,5 +203,5 @@ type State = {
     ConnectionState : ConnectionState
     AppState : AppState }
 
-// (pre-α) | *α* | β | γ | δ | ε | ζ | η | θ | ι | κ | λ | μ | ν | ξ | ο | π | ρ | σ | τ | υ | φ | χ | ψ | ω
-let [<Literal>] SWEEPSTAKE_2022 = "sweepstake 2022 (α)"
+// (pre-α | α) | *β* | γ | δ | ε | ζ | η | θ | ι | κ | λ | μ | ν | ξ | ο | π | ρ | σ | τ | υ | φ | χ | ψ | ω
+let [<Literal>] SWEEPSTAKE_2022 = "sweepstake 2022 (β)"
