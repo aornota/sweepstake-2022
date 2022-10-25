@@ -1,6 +1,7 @@
 .fable/
 .fake/
 .ionide/
+live/
 node_modules/
 paket-files/
 publish/

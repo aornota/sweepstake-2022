@@ -6,6 +6,7 @@
 		, ".fable/": true
 		, ".fake/": true
 		, ".paket/": true
+		, "live": true
 		, "node_modules": true
 		, "packages/": true
 		, "paket-files/": true

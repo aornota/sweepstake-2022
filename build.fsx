@@ -104,6 +104,10 @@ Target.create "publish-ui-azure" (fun _ ->
 Target.create "publish" ignore
 
 Target.create "publish-azure" (fun _ ->
+    let persistedDir, publishPersistedDir = Path.getFullName "./live/persisted", publishDir </> "persisted"
+    let secretDir, publishSecretDir = Path.getFullName "./live/secret", publishDir </> "secret"
+    Shell.copyDir publishPersistedDir persistedDir FileFilter.allFiles
+    Shell.copyDir publishSecretDir secretDir FileFilter.allFiles
     let zipFile = "deploy.zip"
     IO.File.Delete(zipFile)
     Zip.zip publishDir zipFile !!(publishDir + @"\**\**"))
