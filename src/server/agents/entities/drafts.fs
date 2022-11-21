@@ -450,7 +450,7 @@ let private processDraft source draftId draftOrdinal (pickPriorityDic:PickPriori
     existingPicks |> List.iter (fun (draftPick, _) -> draftPick |> allPicked.Add |> ignore)
     "Ignoring withdrawn players" |> Verbose |> log
     let userStatuses, events = userStatuses |> ignoreWithdrawnPlayers draftId squadDic
-    let seed = 12345678
+    let seed = 87654321
     sprintf "Using random seed %i" seed |> Verbose |> log
     let random = Random seed
     processRounds random draftId draftOrdinal userStatuses allPicked squadDic 1u ([ (draftId, seed) |> DraftEvent.ProcessingStarted ] @ events)

@@ -124,7 +124,7 @@ strong { color: currentColor }
 .toast-warning { background-color: var(--warning) }
 .toast-error { background-color: var(--danger) }
 
-/* TODO-NMB: Support table.is-striped? tr.is-selected?... */
+/* TODO-NMB-LOW: Support table.is-striped? tr.is-selected?... */
 .table { margin-bottom: 0.75rem }
 .table.light thead tr:hover { background-color: var(--even-lighter) }
 .table.light tbody tr:hover { background-color: var(--lightest) }
